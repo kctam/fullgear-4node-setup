@@ -1,0 +1,102 @@
+
+version: '2'
+
+volumes:
+    peer1.org2.example.com:
+
+networks:
+    fabric:
+
+services:
+
+    kafka3:
+        extends:
+            file: nodebase.yaml
+            service: kafka
+        container_name: kafka3
+        environment:
+            - KAFKA_BROKER_ID=3
+            - KAFKA_ZOOKEEPER_CONNECT=zookeeper0:2181,zookeeper1:2181,zookeeper2:2181
+            - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka3:9092
+            - KAFKA_MESSAGE_MAX_BYTES=1000012 B
+            - KAFKA_REPLICA_FETCH_MAX_BYTES=1048576 B
+            - KAFKA_REPLICA_FETCH_RESPONSE_MAX_BYTES=10485760 B
+        extra_hosts:
+            - "zookeeper0:${NODE1}"
+            - "zookeeper1:${NODE2}"
+            - "zookeeper2:${NODE3}"
+            - "kafka0:${NODE1}"
+            - "kafka2:${NODE3}"
+            - "kafka1:${NODE2}"
+            - "orderer0.example.com:${NODE1}"
+            - "orderer1.example.com:${NODE2}"
+            - "orderer2.example.com:${NODE3}"
+        networks:
+            - fabric
+
+    peer1.org2.example.com:
+        container_name: peer1.org2.example.com
+        extends:
+            file: nodebase.yaml
+            service: peer
+        environment:
+            - CORE_PEER_ID=peer1.org2.example.com
+            - CORE_PEER_ADDRESS=peer1.org2.example.com:7051
+            - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.org2.example.com:7051
+            - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org2.example.com:7051
+            - CORE_PEER_LOCALMSPID=Org2MSP
+        extra_hosts:
+            - "orderer0.example.com:${NODE1}"
+            - "orderer1.example.com:${NODE2}"
+            - "orderer2.example.com:${NODE3}"
+            - "peer0.org1.example.com:${NODE1}"
+            - "peer0.org2.example.com:${NODE3}"
+            - "peer1.org1.example.com:${NODE2}"
+        volumes:
+            - /var/run/:/host/var/run/
+            - ./crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/msp:/etc/hyperledger/fabric/msp
+            - ./crypto-config/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls:/etc/hyperledger/fabric/tls
+            - peer1.org2.example.com:/var/hyperledger/production
+        ports:
+            - 7051:7051
+            - 7053:7053
+        networks:
+            - fabric
+
+    cli:
+        container_name: cli
+        image: hyperledger/fabric-tools
+        tty: true
+        stdin_open: true
+        environment:
+            - GOPATH=/opt/gopath
+            - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+            #- FABRIC_LOGGING_SPEC=DEBUG
+            - FABRIC_LOGGING_SPEC=INFO
+            - CORE_PEER_ID=cli
+            - CORE_PEER_ADDRESS=peer1.org2.example.com:7051
+            - CORE_PEER_LOCALMSPID=Org2MSP
+            - CORE_PEER_TLS_ENABLED=false
+            - CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/server.crt
+            - CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/server.key
+            - CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer1.org2.example.com/tls/ca.crt
+            - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+        extra_hosts:
+            - "orderer0.example.com:${NODE1}"
+            - "orderer1.example.com:${NODE2}"
+            - "orderer2.example.com:${NODE3}"
+            - "peer0.org1.example.com:${NODE1}"
+            - "peer0.org2.example.com:${NODE3}"
+            - "peer1.org1.example.com:${NODE2}"
+        working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+        command: /bin/bash
+        volumes:
+            - /var/run/:/host/var/run/
+            - ./../chaincode/:/opt/gopath/src/github.com/chaincode
+            - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/
+            - ./scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/
+            - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+        depends_on:
+            - peer1.org2.example.com
+        networks:
+          - fabric
